@@ -88,6 +88,9 @@ const urlRegex = (() => {
       `(?:${withAuth}|${withoutAuth}|www\\.)${urlChar}*(?!${postUrlPunct})${urlChar}`, 'g');
 })();
 
+// https://stackoverflow.com/a/68957976
+const base64 = /^(?=(?:.{4})*$)[A-Za-z0-9+/]*(?:[AQgw]==|[AEIMQUYcgkosw048]=)?$/;
+
 const padutils = {
   /**
    * Prints a warning message followed by a stack trace (to make it easier to figure out what code
@@ -327,6 +330,18 @@ const padutils = {
       return cc;
     }
   }),
+
+  /**
+   * Returns whether a string has the expected format to be used as a secret token identifying an
+   * author. The format is defined as: 't.' followed by a non-empty base64 string (RFC 4648 section
+   * 4 with padding).
+   *
+   * Being strict about what constitutes a valid token enables unambiguous extensibility (e.g.,
+   * conditional transformation of a token to a database key in a way that does not allow a
+   * malicious user to impersonate another user).
+   */
+  isValidAuthorToken:
+      (t) => typeof t === 'string' && t.length > 2 && t.startsWith('t.') && base64.test(t.slice(2)),
 
   /**
    * Returns a string that can be used in the `token` cookie as a secret that authenticates a
