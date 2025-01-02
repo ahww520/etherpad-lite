@@ -1,6 +1,6 @@
 # Etherpad: A real-time collaborative editor for the web
 
-![Demo Etherpad Animated Jif](doc/images/etherpad_demo.gif "Etherpad in action")
+![Demo Etherpad Animated Jif](doc/public/etherpad_demo.gif "Etherpad in action")
 
 ## About
 
@@ -12,36 +12,15 @@ capabilities, and runs on _your_ server, under _your_ control.
 
 ## Try it out
 
-Etherpad is extremely flexible providing you the means to modify it to solve
-whatever problem your community has. We provide some demo instances for you try
-different experiences available within Etherpad. Pad content is automatically
-removed after 24 hours.
-
-  * [Rich Editing](https://rich.etherpad.com) - A full rich text WYSIWYG editor.
-  * [Minimalist editor](https://minimalist.etherpad.com) - A minimalist editor
-    that can be embedded within your tool.
-  * [Dark Mode](https://dark.etherpad.com) - Theme settings to have Etherpad
-    start in dark mode, ideal for using Etherpad at night or for long durations.
-  * [Images](https://image.etherpad.com) - Plugins to improve provide Image
-    support within a pad.
-  * [Video Chat](https://video.etherpad.com) - Plugins to enable Video and Audio
-    chat in a pad.
-  * [Collaboration++](https://collab.etherpad.com) - Plugins to improve the
-    really-real time collaboration experience, suitable for busy pads.
-  * [Document Analysis](https://analysis.etherpad.com) - Plugins to improve
-    author and document analysis during and post creation.
-  * [Scale](https://shard.etherpad.com) - Etherpad running at scale with pad
-    sharding which allows Etherpad to scale to ∞ number of Active Pads with up
-    to ~20,000 edits per second, per pad.
+Wikimedia provide a [public Etherpad instance for you to Try Etherpad out.](https://etherpad.wikimedia.org) or [use another public Etherpad instance to see other features](https://github.com/ether/etherpad-lite/wiki/Sites-That-Run-Etherpad#sites-that-run-etherpad)
 
 ## Project Status
+
+We're looking for maintainers and have some funding available.  Please contact John McLear if you can help.
 
 ### Code Quality
 
 [![Code Quality](https://github.com/ether/etherpad-lite/actions/workflows/codeql-analysis.yml/badge.svg?color=%2344b492)](https://github.com/ether/etherpad-lite/actions/workflows/codeql-analysis.yml)
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/ether/etherpad-lite.svg?logo=lgtm&logoWidth=18&color=%2344b492)](https://lgtm.com/projects/g/ether/etherpad-lite/alerts/)
-[![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/ether/etherpad-lite.svg?logo=lgtm&logoWidth=18&color=%2344b492)](https://lgtm.com/projects/g/ether/etherpad-lite/context:javascript)
-[![package.lock](https://github.com/ether/etherpad-lite/actions/workflows/lint-package-lock.yml/badge.svg?color=%2344b492)](https://github.com/ether/etherpad-lite/actions/workflows/lint-package-lock.yml)
 
 ### Testing
 
@@ -64,87 +43,86 @@ removed after 24 hours.
 
 ## Installation
 
-### Requirements
+### Docker-Compose
 
-[Node.js](https://nodejs.org/) >= **12.17.0**.
+```yaml
+services:
+  app:
+    user: "0:0"
+    image: etherpad/etherpad:latest
+    tty: true
+    stdin_open: true
+    volumes:
+      - plugins:/opt/etherpad-lite/src/plugin_packages
+      - etherpad-var:/opt/etherpad-lite/var
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: production
+      ADMIN_PASSWORD: ${DOCKER_COMPOSE_APP_ADMIN_PASSWORD:-admin}
+      DB_CHARSET: ${DOCKER_COMPOSE_APP_DB_CHARSET:-utf8mb4}
+      DB_HOST: postgres
+      DB_NAME: ${DOCKER_COMPOSE_POSTGRES_DATABASE:-etherpad}
+      DB_PASS: ${DOCKER_COMPOSE_POSTGRES_PASSWORD:-admin}
+      DB_PORT: ${DOCKER_COMPOSE_POSTGRES_PORT:-5432}
+      DB_TYPE: "postgres"
+      DB_USER: ${DOCKER_COMPOSE_POSTGRES_USER:-admin}
+      # For now, the env var DEFAULT_PAD_TEXT cannot be unset or empty; it seems to be mandatory in the latest version of etherpad
+      DEFAULT_PAD_TEXT: ${DOCKER_COMPOSE_APP_DEFAULT_PAD_TEXT:- }
+      DISABLE_IP_LOGGING: ${DOCKER_COMPOSE_APP_DISABLE_IP_LOGGING:-false}
+      SOFFICE: ${DOCKER_COMPOSE_APP_SOFFICE:-null}
+      TRUST_PROXY: ${DOCKER_COMPOSE_APP_TRUST_PROXY:-true}
+    restart: always
+    ports:
+      - "${DOCKER_COMPOSE_APP_PORT_PUBLISHED:-9001}:${DOCKER_COMPOSE_APP_PORT_TARGET:-9001}"
 
-### GNU/Linux and other UNIX-like systems
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${DOCKER_COMPOSE_POSTGRES_DATABASE:-etherpad}
+      POSTGRES_PASSWORD: ${DOCKER_COMPOSE_POSTGRES_PASSWORD:-admin}
+      POSTGRES_PORT: ${DOCKER_COMPOSE_POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${DOCKER_COMPOSE_POSTGRES_USER:-admin}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    restart: always
+    # Exposing the port is not needed unless you want to access this database instance from the host.
+    # Be careful when other postgres docker container are running on the same port
+    # ports:
+    #   - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
 
-#### Quick install on Debian/Ubuntu
-
-```sh
-curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
-sudo apt install -y nodejs
-git clone --branch master https://github.com/ether/etherpad-lite.git &&
-cd etherpad-lite &&
-src/bin/run.sh
+volumes:
+  postgres_data:
+  plugins:
+  etherpad-var:
 ```
 
-#### Manual install
+### Requirements
 
-You'll need Git and [Node.js](https://nodejs.org/) installed.
+[Node.js](https://nodejs.org/) >= **18.18.2**.
 
-**As any user (we recommend creating a separate user called etherpad):**
+### Windows, macOS, Linux
 
-  1. Move to a folder where you want to install Etherpad.
-  2. Clone the Git repository: `git clone --branch master
-     https://github.com/ether/etherpad-lite.git`
-  3. Change into the new directory containing the cloned source code: `cd
-     etherpad-lite`
-  4. Run `src/bin/run.sh` and open http://127.0.0.1:9001 in your browser.
-
-To update to the latest released version, execute `git pull origin`. The next
-start with `src/bin/run.sh` will update the dependencies.
-
-### Windows
-
-#### Prebuilt Windows package
-
-This package runs on any Windows machine. You can perform a manual installation
-via git for development purposes, but as this uses symlinks which performs
-unreliably on Windows, please stick to the prebuilt package if possible.
-
-  1. [Download the latest Windows package](https://etherpad.org/#download)
-  2. Extract the folder
-
-Run `start.bat` and open <http://localhost:9001> in your browser.
-
-#### Manually install on Windows
-
-You'll need [Node.js](https://nodejs.org) and (optionally, though recommended)
-git.
-
-  1. Grab the source, either:
-      * download <https://github.com/ether/etherpad-lite/zipball/master>
-      * or `git clone --branch master
-        https://github.com/ether/etherpad-lite.git`
-  2. With a "Run as administrator" command prompt execute
-     `src\bin\installOnWindows.bat`
-
-Now, run `start.bat` and open http://localhost:9001 in your browser.
-
-Update to the latest version with `git pull origin`, then run
-`src\bin\installOnWindows.bat`, again.
-
-If cloning to a subdirectory within another project, you may need to do the
-following:
-
-  1. Start the server manually (e.g. `node src/node/server.js`)
-  2. Edit the db `filename` in `settings.json` to the relative directory with
-     the file (e.g. `application/lib/etherpad-lite/var/dirty.db`)
-  3. Add auto-generated files to the main project `.gitignore`
+1. Download the latest Node.js runtime from [nodejs.org](https://nodejs.org/).
+2. Install pnpm: `npm install -g pnpm` (Administrator privileges may be required).
+3. Clone the repository: `git clone -b master`
+4. Run `pnpm i`
+5. Run `pnpm run build:etherpad`
+6. Run `pnpm run prod`
+7. Visit `http://localhost:9001` in your browser.
 
 ### Docker container
 
-Find [here](doc/docker.md) information on running Etherpad in a container.
+Find [here](doc/docker.adoc) information on running Etherpad in a container.
 
 ## Plugins
 
 Etherpad is very customizable through plugins.
 
-![Basic install](doc/images/etherpad_basic.png "Basic Installation")
+![Basic install](doc/public/etherpad_basic.png "Basic Installation")
 
-![Full Features](doc/images/etherpad_full_features.png "You can add a lot of plugins !")
+![Full Features](doc/public/etherpad_full_features.png "You can add a lot of plugins !")
 
 ### Available Plugins
 
@@ -160,9 +138,7 @@ Alternatively, you can install plugins from the command line:
 
 ```sh
 cd /path/to/etherpad-lite
-# The `--no-save` and `--legacy-peer-deps` arguments are necessary to work
-# around npm quirks.
-npm install --no-save --legacy-peer-deps ep_${plugin_name}
+pnpm run plugins i ep_${plugin_name}
 ```
 
 Also see [the plugin wiki
@@ -174,7 +150,7 @@ Run the following command in your Etherpad folder to get all of the features
 visible in the above demo gif:
 
 ```sh
-npm install --no-save --legacy-peer-deps \
+pnpm run plugins i \
   ep_align \
   ep_comments_page \
   ep_embedded_hyperlinks2 \
@@ -198,12 +174,37 @@ following plugins:
     that each user's chosen color, display name, comment ownership, etc. is
     strongly linked to their account.
 
+### Upgrade Etherpad
+
+Run the following command in your Etherpad folder to upgrade
+
+1. Stop any running Etherpad (manual, systemd ...)
+2. Get present version
+```sh
+git -P tag --contains
+```
+3. List versions available
+```sh
+git -P tag --list "v*" --merged
+```
+4. Select the version
+```sh
+git checkout v2.2.5 
+git switch -c v2.2.5
+```
+5. Upgrade Etherpad
+```sh
+./bin/run.sh
+```
+6. Stop with [CTRL-C]
+7. Restart your Etherpad service
+
 ## Next Steps
 
 ### Tweak the settings
 
 You can modify the settings in `settings.json`. If you need to handle multiple
-settings files, you can pass the path to a settings file to `src/bin/run.sh`
+settings files, you can pass the path to a settings file to `bin/run.sh`
 using the `-s|--settings` option: this allows you to run multiple Etherpad
 instances from the same installation. Similarly, `--credentials` can be used to
 give a settings override file, `--apikey` to give a different APIKEY.txt file
@@ -234,7 +235,7 @@ edit `settings.json` and restart Etherpad each time.
 Open http://127.0.0.1:9001/p/test#skinvariantsbuilder in your browser and start
 playing!
 
-![Skin Variant](doc/images/etherpad_skin_variants.gif "Skin variants")
+![Skin Variant](doc/public/etherpad_skin_variants.gif "Skin variants")
 
 ## Helpful resources
 
@@ -247,11 +248,11 @@ Documentation can be found in `doc/`.
 
 ### Things you should know
 
-You can debug Etherpad using `src/bin/debugRun.sh`.
+You can debug Etherpad using `bin/debugRun.sh`.
 
-You can run Etherpad quickly launching `src/bin/fastRun.sh`. It's convenient for
+You can run Etherpad quickly launching `bin/fastRun.sh`. It's convenient for
 developers and advanced users. Be aware that it will skip the dependencies
-update, so remember to run `src/bin/installDeps.sh` after installing a new
+update, so remember to run `bin/installDeps.sh` after installing a new
 dependency or upgrading version.
 
 If you want to find out how Etherpad's `Easysync` works (the library that makes
