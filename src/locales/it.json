@@ -302,7 +302,7 @@
 	"pad.importExport.exportworda.title": "Esporta come Microsoft Word",
 	"pad.importExport.exportpdfa.title": "Esporta in formato PDF",
 	"pad.importExport.exportopena.title": "Esporta in formato ODF (Open Document Format)",
-	"pad.importExport.noConverter.innerHTML": "È possibile importare solo file di testo semplice o in formato HTML. Per funzionalità di importazione più avanzate, si prega <a href=\"https://github.com/ether/etherpad-lite/wiki/How-to-enable-importing-and-exporting-different-file-formats-with-AbiWord\">di installare LibreOffice</a> .",
+	"pad.importExport.noConverter.innerHTML": "È possibile importare direttamente file di testo semplice, HTML, Microsoft Word (.docx) e file Etherpad. Per importare altri formati come PDF, ODT, DOC o RTF, l'amministratore del server deve installare LibreOffice: consulta la <a href=\"https://docs.etherpad.org/\">documentazione di Etherpad</a>.",
 	"pad.modals.connected": "Connesso.",
 	"pad.modals.reconnecting": "Riconnessione al pad in corso…",
 	"pad.modals.forcereconnect": "Forza la riconnessione",
