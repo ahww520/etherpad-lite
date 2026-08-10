@@ -325,7 +325,7 @@
 	"pad.importExport.exportworda.title": "Exporteren als Microsoft Word",
 	"pad.importExport.exportpdfa.title": "Exporteren als pdf",
 	"pad.importExport.exportopena.title": "Exporteren als ODF (Open Document Format)",
-	"pad.importExport.noConverter.innerHTML": "U kunt alleen importeren vanuit platte tekst of HTML-bestanden. Voor meer geavanceerde importfuncties kunt u <a href=\"https://github.com/ether/etherpad-lite/wiki/How-to-enable-importing-and-exporting-different-file-formats-with-AbiWord\">LibreOffice installeren</a>.",
+	"pad.importExport.noConverter.innerHTML": "U kunt rechtstreeks platte tekst, HTML-, Microsoft Word- (.docx) en Etherpad-bestanden importeren. Om andere formaten zoals PDF, ODT, DOC of RTF te importeren, moet de serverbeheerder LibreOffice installeren — zie de <a href=\"https://docs.etherpad.org/\">Etherpad-documentatie</a>.",
 	"pad.modals.connected": "Verbonden.",
 	"pad.modals.reconnecting": "De verbinding met uw notitie wordt hersteld…",
 	"pad.modals.forcereconnect": "Opnieuw verbinden",
