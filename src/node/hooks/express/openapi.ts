@@ -25,6 +25,7 @@ const createHTTPError = require('http-errors');
 
 const apiHandler = require('../../handler/APIHandler');
 import settings from '../../utils/Settings';
+import {sanitizeHost, sanitizePublicURL} from '../../utils/sanitizeOrigin';
 
 import log4js from 'log4js';
 const logger = log4js.getLogger('API');
@@ -860,16 +861,28 @@ exports.expressPreSession = async (hookName:string, {app}:any) => {
 const getApiRootForVersion = (version:string, style:any = APIPathStyle.FLAT): string => `/${style}/${version}`;
 
 /**
- * Helper to generate an OpenAPI server object when serving definitions
+ * Helper to generate an OpenAPI server object when serving definitions.
+ *
+ * Prefers `settings.publicURL` when configured — it is operator-trusted and not
+ * derived from client-controlled headers. Otherwise it falls back to the
+ * request's scheme + Host, hardening both: the scheme is capped to http/https
+ * (a spoofed `X-Forwarded-Proto` can't smuggle a different scheme) and the Host
+ * is validated so a crafted/invalid `Host` header can't leak into the document.
  * @param {String} apiRoot The root path for the API version
  * @param {Request} req The express request object
  * @return {url: String} The server object for the OpenAPI definition location
  */
 const generateServerForApiVersion = (apiRoot:string, req:any): {
   url:string
-} => ({
-  url: `${settings.ssl ? 'https' : 'http'}://${req.headers.host}${apiRoot}`,
-});
+} => {
+  const publicURL = sanitizePublicURL(settings.publicURL);
+  if (publicURL) return {url: `${publicURL}${apiRoot}`};
+
+  const proto = req.protocol === 'https' ? 'https' : 'http';
+  const host = sanitizeHost(req.get && req.get('host')) || 'localhost';
+  return {url: `${proto}://${host}${apiRoot}`};
+};
 
 exports.generateDefinitionForVersion = generateDefinitionForVersion;
 exports.APIPathStyle = APIPathStyle;
+exports.generateServerForApiVersion = generateServerForApiVersion;
