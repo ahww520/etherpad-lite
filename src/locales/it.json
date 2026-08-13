@@ -149,6 +149,7 @@
 	"admin_settings.toast.validation_failed": "Il formato JSON non è valido: correggere gli errori di sintassi.",
 	"admin_settings.mode.form": "Modulo",
 	"admin_settings.mode.aria_label": "Modalità editor",
+	"admin_settings.envvar_banner.title": "Questo file è un modello, non la configurazione reale.",
 	"admin_settings.section.general": "Generale",
 	"admin_settings.parse_error.title": "Impossibile analizzare il file settings.json",
 	"admin_settings.parse_error.cta": "Passa al formato raw per modificare",
