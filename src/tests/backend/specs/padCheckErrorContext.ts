@@ -81,13 +81,14 @@ describe(__filename, function () {
     });
 
     it('surfaces the revision through deleteRevisions()', async function () {
-      // deleteRevisions() calls pad.check() before touching anything, so
-      // this is the exact path from the issue report.
+      // deleteRevisions() detects the missing revision up front and throws a
+      // dedicated message before pad.check() runs, but the stack must still
+      // name the pad and the revision that is missing.
       await padWithMissingRevision(3);
       padManager.unloadPad(padId);
       const err: any = await deleteRevisions(padId, 2).then(() => null, (e: any) => e);
       assert.ok(err != null, 'expected deleteRevisions to throw');
-      assert.match(err.stack, new RegExp(`\\(pad ${padId} revision 3\\)`),
+      assert.match(err.stack, new RegExp(`Pad ${padId} is missing revision\\(s\\) 3`),
           `err.stack lost the revision context:\n${err.stack}`);
     });
   });
