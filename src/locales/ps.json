@@ -2,6 +2,7 @@
 	"@metadata": {
 		"authors": [
 			"Ahmed-Najib-Biabani-Ibrahimkhel",
+			"باران",
 			"شاه زمان پټان"
 		]
 	},
@@ -12,6 +13,7 @@
 	"admin.shout": "اړيکتيا",
 	"admin_shout.online_one": "اوسمهال {{count}} کارنان پرليکه دي",
 	"admin_shout.online_other": "اوسمهال {{count}} کارنان پرليکه دي",
+	"admin_shout.sticky_toggle": "سرېښېدونکی پيغام بدل کړئ",
 	"admin_login.title": "اېترپيډ",
 	"admin_login.username": "کارن‌نوم",
 	"admin_login.password": "پټنوم",
@@ -61,6 +63,14 @@
 	"admin_pads.stats.revisions_zero": "۰ بياليدنې",
 	"admin_pads.stats.total": "ټولټال ليکچې",
 	"admin_pads.stats.users_active": "وسمهال {{count}} کارنده",
+	"admin_plugins": "لگون مهاروونکی",
+	"admin_plugins.available": "شته لگونونه",
+	"admin_plugins.available_not-found": "هېڅ لگون و نه موندل شول.",
+	"admin_plugins.available_fetching": "ترلاسه‌کېږي...",
+	"admin_plugins.available_install.value": "لگول",
+	"admin_plugins.available_search.placeholder": "لگونونه وپلټئ؛ ترڅو يې ولگوئ",
+	"admin_plugins.check_updates": "د هم‌مهالېدنو سم‌کننه",
+	"admin_plugins.crumbs": "لگونونه",
 	"admin_plugins.description": "څرگنداوی",
 	"admin_plugins.disables.label": "ناچارن‌شوي:",
 	"admin_plugins.last-update": "وروستۍ هم‌مهالېدنه",
