@@ -1,6 +1,7 @@
 'use strict';
 
 import type {Request} from 'express';
+import {sanitizeHost, sanitizePublicURL} from './sanitizeOrigin';
 
 /**
  * Builds the Open Graph + Twitter Card <meta> tag block for the pad page,
@@ -116,24 +117,6 @@ const negotiateRenderLang = (req: Request, availableLangs: AvailableLangs): stri
     if (negotiated) return negotiated;
   }
   return 'en';
-};
-
-// Strict hostname[:port] pattern. Rejects header injection (\r\n), userinfo
-// (user@host), wildcards, and any non-DNS-character garbage. Length-capped so
-// a giant Host header can't blow up the response.
-const HOST_RE = /^[a-z0-9]([a-z0-9.-]{0,253}[a-z0-9])?(:\d{1,5})?$/i;
-
-const sanitizeHost = (host: string | undefined): string | null => {
-  if (!host || host.length > 255) return null;
-  return HOST_RE.test(host) ? host : null;
-};
-
-const sanitizePublicURL = (raw: string | null | undefined): string | null => {
-  if (!raw || typeof raw !== 'string') return null;
-  // Must be http(s)://host[:port], no path. Strip trailing slash if present.
-  const m = raw.replace(/\/+$/, '').match(/^(https?):\/\/([^\/?#]+)$/i);
-  if (!m) return null;
-  return sanitizeHost(m[2]) ? `${m[1].toLowerCase()}://${m[2]}` : null;
 };
 
 // Builds an absolute URL. Prefers settings.publicURL when configured (operator-

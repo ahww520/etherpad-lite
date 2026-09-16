@@ -23,10 +23,15 @@ const groupManager = require('./GroupManager');
 const CustomError = require('../utils/customError');
 import readOnlyManager from './ReadOnlyManager';
 import randomString from '../utils/randomstring';
+import {SYSTEM_AUTHOR_ID} from '../utils/SystemAuthor';
 const hooks = require('../../static/js/pluginfw/hooks');
 import pad_utils from "../../static/js/pad_utils";
 import {SmartOpAssembler} from "../../static/js/SmartOpAssembler";
+import Op from "../../static/js/Op";
 import {timesLimit} from "async";
+import log4js from 'log4js';
+
+const logger = log4js.getLogger('pad');
 
 type PadViewSettings = {
   showAuthorColors: boolean;
@@ -48,6 +53,27 @@ type PadSettings = {
   // normalizePadSettings so plugins can use the existing padoptions
   // broadcast/persist rail without forking their own transport.
   [pluginKey: string]: any;
+};
+
+// Prefixes an error's message with context, keeping `err.stack` in sync.
+//
+// `err.stack` is rendered from the message when the error is constructed, so
+// assigning to `err.message` alone leaves the stack showing the original,
+// context-free text. Everything that reports a failed `pad.check()` logs
+// `err.stack` (Cleanup.checkTodos and the admin `cleanupPadRevisions`
+// handler both do), so without this the pad/revision that actually failed
+// never reaches the log and admins have to bisect the database by hand.
+// See #8134.
+const addErrorContext = (err: Error, context: string): Error => {
+  const oldMessage = err.message;
+  err.message = `${context} ${oldMessage}`;
+  // Only the first occurrence is replaced, which is the message in the
+  // stack's header line. Guard against an empty message: `''` matches at
+  // offset 0 and would corrupt the stack.
+  if (oldMessage && typeof err.stack === 'string' && err.stack.includes(oldMessage)) {
+    err.stack = err.stack.replace(oldMessage, err.message);
+  }
+  return err;
 };
 
 const PLUGIN_KEY_RE = /^ep_[a-z0-9_]+$/;
@@ -101,8 +127,12 @@ class Pad {
    * setDocAText reconciliation in ace2_inner.ts when loading the pad. Using
    * a fixed system author keeps the AText well-formed without requiring
    * every plugin to allocate its own author up-front.
+   *
+   * Kept as a static for plugin compatibility; the canonical definition (and
+   * the one modules with a circular dependency on Pad must use) lives in
+   * ../utils/SystemAuthor.
    */
-  static readonly SYSTEM_AUTHOR_ID = 'a.etherpad-system';
+  static readonly SYSTEM_AUTHOR_ID = SYSTEM_AUTHOR_ID;
 
   /**
    * Validate that every `+` (insert) op in `aChangeset` carries an
@@ -290,6 +320,9 @@ class Pad {
         this.head !== -1) {
       return this.head;
     }
+    // Snapshot for the rollback below, taken before this.atext is mutated.
+    const prevHead = this.head;
+    const prevAText: AText = {text: this.atext.text, attribs: this.atext.attribs};
     copyAText(newAText, this.atext);
 
     const newRev = ++this.head;
@@ -298,7 +331,19 @@ class Pad {
     if (authorId !== '') this.pool.putAttrib(['author', authorId]);
 
     const hook = this.head === 0 ? 'padCreate' : 'padUpdate';
-    await Promise.all([
+
+    // The revision record and the pad record (which carries `head`) are two
+    // independent writes. If the revision write fails while the pad record
+    // lands, the pad claims a revision that was never stored -- and because
+    // the next successful append writes head+1 straight over it, the gap is
+    // permanent. Any later pad.check() then trips on the missing revision,
+    // which blocks cleanup/compaction forever. See #8134.
+    //
+    // They stay concurrent (sequencing them would add a write round-trip to
+    // every commit on the editing hot path); instead a failure rolls the
+    // in-memory state back and re-persists the pad record, so the pad never
+    // ends up pointing past its own history.
+    const storageWrites = Promise.all([
       // @ts-ignore
       this.db.set(`pad:${this.id}:revs:${newRev}`, {
         changeset: aChangeset,
@@ -312,6 +357,12 @@ class Pad {
         },
       }),
       this.saveToDatabase(),
+    ]);
+
+    // Kept separate from the storage writes: a throwing padUpdate hook (or a
+    // failed author-index update) must not roll back a revision that was
+    // stored successfully. Started here so it still runs concurrently.
+    const sideEffects = Promise.all([
       authorId && authorManager.addPad(authorId, this.id),
       hooks.aCallAll(hook, {
         pad: this,
@@ -331,7 +382,47 @@ class Pad {
         },
       }),
     ]);
+    // Awaited below. Attach a no-op handler so a rejection while we're
+    // awaiting the storage writes isn't reported as unhandled.
+    sideEffects.catch(() => {});
+
+    try {
+      await storageWrites;
+    } catch (err) {
+      await this._rollbackFailedRevision(newRev, prevHead, prevAText);
+      throw err;
+    }
+
+    await sideEffects;
     return newRev;
+  }
+
+  /**
+   * Undoes the in-memory effects of a failed appendRevision and re-persists
+   * the pad record, so `head` never points at a revision that isn't stored.
+   *
+   * The attribute pool is deliberately not rolled back: pool entries are
+   * addressed by position, so removing one would invalidate the attribute
+   * numbers in every changeset already written. A pool author with no
+   * revisions is harmless -- pad.check() derives both sides of its author
+   * comparison from the pool, so they still agree.
+   */
+  private async _rollbackFailedRevision(newRev: number, prevHead: number, prevAText: AText) {
+    this.head = prevHead;
+    copyAText(prevAText, this.atext);
+    try {
+      await this.saveToDatabase();
+    } catch (rollbackErr: any) {
+      // Both writes failed. The pad record may still claim `newRev`, which
+      // is the pre-#8134 behaviour; say so loudly rather than silently
+      // leaving a hole for an admin to find months later via a failed
+      // cleanup run.
+      logger.error(
+          `pad ${this.id}: revision ${newRev} failed to store AND the ` +
+          `rollback of head to ${prevHead} failed. The pad record may claim ` +
+          `a revision that does not exist; run a consistency check on it. ` +
+          `Rollback error: ${rollbackErr.stack || rollbackErr}`);
+    }
   }
 
   toJSON() {
@@ -745,7 +836,7 @@ class Pad {
     }
 
     // flush the source pad
-    this.saveToDatabase();
+    await this.saveToDatabase();
 
     // if it's a group pad, let's make sure the group exists.
     const destGroupID = await this.checkIfGroupExistAndReturnIt(destinationID);
@@ -785,19 +876,39 @@ class Pad {
       }
       assem.append(op);
     }
-    assem.endDocument();
-
     // although we have instantiated the dstPad with '\n', an additional '\n' is
     // added internally, so the pad text on the revision 0 is "\n\n"
     const oldLength = 2;
 
-    const newLength = assem.getLengthChange();
-    const newText = oldAText.text;
+    // opsFromAText() intentionally omits the source document's final newline,
+    // so the ops appended above insert oldAText.text minus its last character.
+    // Both of the destination pad's existing newlines would then survive and
+    // the copy would come out one newline longer than the source -- growing
+    // again on every subsequent copy. Delete one of them so the copy's text
+    // matches the source exactly.
+    const dropExtraNewline = new Op('-');
+    dropExtraNewline.chars = 1;
+    dropExtraNewline.lines = 1;
+    assem.append(dropExtraNewline);
+    assem.endDocument();
+
+    // pack() takes the TOTAL length of the new document, not the delta.
+    // Passing the delta (assem.getLengthChange()) produced a changeset whose
+    // header disagreed with its own ops, so every pad produced by this
+    // function failed checkRep() -- and therefore pad.check(), which is what
+    // `cleanup.keepRevisions` runs before it will touch a pad.
+    const newLength = oldLength + assem.getLengthChange();
+    // The char bank holds only the inserted characters, which is the source
+    // text without the final newline that opsFromAText() skipped.
+    const newText = oldAText.text.slice(0, -1);
 
     // create a changeset that removes the previous text and add the newText with
     // all atributes present on the source pad
     const changeset = pack(oldLength, newLength, assem.toString(), newText);
-    dstPad.appendRevision(changeset, authorId);
+    // Must be awaited: an un-awaited rejection here (an invalid changeset,
+    // a failed write) surfaces as an unhandled rejection instead of failing
+    // the copy, which is how the length bug above went unnoticed.
+    await dstPad.appendRevision(changeset, authorId);
 
     await hooks.aCallAll('padCopy', {
       get originalPad() {
@@ -912,6 +1023,39 @@ class Pad {
   }
 
   /**
+   * Scans `0..head` for revisions that are absent or unusable.
+   *
+   * `check()` already trips over these, but only as
+   * `assert(timestamp != null)` part-way through replaying the history --
+   * an assertion about a null timestamp, when what the operator needs to
+   * hear is "revision 600 is missing". This reports the gaps directly so
+   * callers can say something actionable instead. See #8134.
+   *
+   * Cheap relative to check(): it reads one sub-field per revision and
+   * replays nothing.
+   *
+   * @param limit Stop after this many gaps. A pad damaged by a failed
+   *     cleanup can be missing hundreds of revisions and the operator does
+   *     not need them all enumerated.
+   * @returns Ascending revision numbers with no usable stored record.
+   */
+  async findMissingRevisions(limit = 20): Promise<number[]> {
+    const missing: number[] = [];
+    const revs = Stream.range(0, this.getHeadRevisionNumber() + 1)
+        .map(async (r: number) => [r, await this.getRevisionDate(r)])
+        .batch(100).buffer(99);
+    for await (const [r, timestamp] of revs) {
+      // A record that exists but carries no meta.timestamp is just as
+      // unreplayable as one that is absent, and fails check() identically.
+      if (timestamp == null) {
+        missing.push(r);
+        if (missing.length >= limit) break;
+      }
+    }
+    return missing;
+  }
+
+  /**
    * Asserts that all pad data is consistent. Throws if inconsistent.
    */
   async check() {
@@ -970,8 +1114,7 @@ class Pad {
               isKeyRev ? this._getKeyRevisionAText(r) : null,
             ]);
           } catch (err:any) {
-            err.message = `(pad ${this.id} revision ${r}) ${err.message}`;
-            throw err;
+            throw addErrorContext(err, `(pad ${this.id} revision ${r})`);
           }
         })
         .batch(100).buffer(99);
@@ -1009,8 +1152,7 @@ class Pad {
         atext = applyToAText(changeset, atext, pool);
         if (isKeyRev) assert.deepEqual(keyAText, atext);
       } catch (err:any) {
-        err.message = `(pad ${this.id} revision ${r}) ${err.message}`;
-        throw err;
+        throw addErrorContext(err, `(pad ${this.id} revision ${r})`);
       }
     }
     assert.equal(this.text(), atext.text);
@@ -1027,8 +1169,7 @@ class Pad {
             assert(msg != null);
             assert(msg instanceof ChatMessage);
           } catch (err:any) {
-            err.message = `(pad ${this.id} chat message ${c}) ${err.message}`;
-            throw err;
+            throw addErrorContext(err, `(pad ${this.id} chat message ${c})`);
           }
         })
         .batch(100).buffer(99);
