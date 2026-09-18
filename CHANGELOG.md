@@ -1,3 +1,9 @@
+# 3.3.6
+
+### Notable fixes
+
+- **Plugins — `settings.ep_<plugin>` config blocks are reachable again from `require()` (#8109, #8110).** Plugins read their own configuration out of a top-level `ep_*` block in `settings.json` via `require('ep_etherpad-lite/node/utils/Settings')`. The CJS-compatibility shim in `Settings.ts` installed accessor properties on `module.exports` for the keys present on the settings object *while that module was still evaluating* — but `ep_*` blocks are only merged in later, by the `reloadSettings()` call at the bottom of the same module. Every plugin config block was therefore invisible to the `require()` path (the value was reachable only under `.default`), so plugins silently fell back to their built-in defaults. For `ep_hash_auth` that meant `hash_dir` reverted to `/var/etherpad/users`, every hash lookup failed, and admin login returned 401 with no usable diagnostic — the symptom that surfaced this. The shim is now re-run after each settings load. Reported by @mathewcsims and @tris-ots; an equivalent fix was also proposed by @AkprasadoP in #8113.
+
 # 3.3.5
 
 3.3.5 is a bug-fix follow-up to 3.3.4. It fixes a startup crash on fresh installs when pnpm 12 (now pnpm's default release) is installed, and makes the built-in updater work on Windows.
