@@ -50,6 +50,7 @@
 	"admin_pads.empty_never_edited": "tyhjä · ei koskaan muokattu",
 	"admin_pads.error_dialog_description": "Tapahtui virhe.",
 	"admin_pads.error_prefix": "Virhe",
+	"admin_pads.filter.active": "Aktiivinen",
 	"admin_pads.filter.all": "Kaikki",
 	"admin_pads.pagination.next": "Seuraava",
 	"admin_pads.pagination.previous": "Edellinen",
