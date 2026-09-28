@@ -103,6 +103,7 @@
 	"admin_plugins.source": "प्लगइन स्रोत",
 	"admin_plugins.subtitle": "इथरप्याड प्लगइनहरू स्थापना, अद्यावधिक, र हटाउनुहोस् । परिवर्तनका लागि सर्भर पुनः सुरु गर्नु आवश्यक हुन्छ ।",
 	"admin_plugins.tag_core": "कोर",
+	"admin_plugins.tag_deprecated": "बहिष्कृत",
 	"admin_plugins.update_tooltip": "अद्यतन",
 	"admin_plugins.updates_available": "अद्यावधिकहरू उपलब्ध छन्",
 	"admin_plugins.update_now": "अद्यतन",
